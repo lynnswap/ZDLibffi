@@ -34,8 +34,11 @@
 /* Define to 1 if you have the <alloca.h> header file. */
 #define HAVE_ALLOCA_H 1
 
-/* Define if your compiler supports pointer authentication. */
-/* #undef HAVE_ARM64E_PTRAUTH */
+/* This header is shared by arm64 and arm64e; select the ABI for each build,
+   including assembler-with-cpp, rather than the source-generation host. */
+#if __has_feature(ptrauth_calls)
+#define HAVE_ARM64E_PTRAUTH 1
+#endif
 
 /* Define if your assembler supports .cfi_* directives. */
 #define HAVE_AS_CFI_PSEUDO_OP 1

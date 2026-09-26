@@ -54,7 +54,12 @@ pod lib lint ZDLibffi.podspec --allow-warnings --platforms=ios --use-modular-hea
 # SwiftPM
 swift package describe
 swift build
+
+# Check arm64/arm64e code generation and run scalar, aggregate, and closure calls
+python3 scripts/test_pointer_authentication.py
 ```
+
+With a toolchain that supports arm64e.x1, add `--architectures arm64 arm64e arm64e.x1` to check that slice's code generation too. Cross-compilation does not replace execution on supported hardware. `Tests/PointerAuthentication.c` can also be compiled with `ZD_TEST_NO_MAIN` and called from a signed device test host.
 
 ### Triggering CI
 

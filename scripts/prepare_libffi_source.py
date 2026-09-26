@@ -90,6 +90,41 @@ def patch_include(header_path: Path, header_name: str):
         header_path.write_text(content, encoding="utf-8")
 
 
+def patch_arm64_pointer_authentication(header_path: Path):
+    content = header_path.read_text(encoding="utf-8")
+    original = "/* Define if your compiler supports pointer authentication. */\n/* #undef HAVE_ARM64E_PTRAUTH */"
+    replacement = """/* This header is shared by arm64 and arm64e; select the ABI for each build,
+   including assembler-with-cpp, rather than the source-generation host. */
+#if __has_feature(ptrauth_calls)
+#define HAVE_ARM64E_PTRAUTH 1
+#endif"""
+    if original not in content:
+        raise ValueError("Review the regenerated HAVE_ARM64E_PTRAUTH configuration before updating Source/")
+    header_path.write_text(content.replace(original, replacement, 1), encoding="utf-8")
+
+
+def patch_trampoline_declaration(source_path: Path):
+    content = source_path.read_text(encoding="utf-8")
+    original = "extern void *ffi_closure_trampoline_table_page;"
+    replacement = """/* The assembly label is executable code. A function declaration supplies the
+   signature consumed by the arm64e authentication below. */
+extern void ffi_closure_trampoline_table_page (void);"""
+    if original not in content:
+        raise ValueError("Review the regenerated closure trampoline declaration before updating Source/")
+    source_path.write_text(content.replace(original, replacement, 1), encoding="utf-8")
+
+
+def patch_arm64_trampoline_branch(source_path: Path):
+    content = source_path.read_text(encoding="utf-8")
+    original = "    ldp x17, x16, [x16]\n    br x16"
+    replacement = """    ldp x17, x16, [x16]
+    /* config[1] is a generic function pointer, signed on arm64e. */
+    BRANCH_TO_REG x16"""
+    if original not in content:
+        raise ValueError("Review the regenerated arm64 closure trampoline branch before updating Source/")
+    source_path.write_text(content.replace(original, replacement, 1), encoding="utf-8")
+
+
 def prepare_source_tree(libffi_dir: Path, output_dir: Path):
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -107,6 +142,7 @@ def prepare_source_tree(libffi_dir: Path, output_dir: Path):
     # Common sources used across all Apple targets.
     for src_file in sorted((libffi_dir / "src").glob("*.c")):
         shutil.copy2(src_file, src_common_dir / src_file.name)
+    patch_trampoline_declaration(src_common_dir / "closures.c")
 
     arm64 = ARCH_BY_NAME["arm64"]
     arm64_32 = ARCH_BY_NAME["arm64_32"]
@@ -126,6 +162,7 @@ def prepare_source_tree(libffi_dir: Path, output_dir: Path):
         arm64["wrap_prefix"],
         arm64["wrap_suffix"],
     )
+    patch_arm64_trampoline_branch(src_aarch64_dir / "sysv_arm64.S")
     copy_wrapped_file(
         aarch64_src / "ffi.c",
         src_aarch64_dir / "ffi_arm64_32.c",
@@ -240,6 +277,8 @@ def configure_and_generate_headers(libffi_dir: Path, output_dir: Path):
             arch["wrap_prefix"],
             arch["wrap_suffix"],
         )
+        if arch["name"] == "arm64":
+            patch_arm64_pointer_authentication(include_output / f"fficonfig_{suffix}.h")
         copy_wrapped_file(
             build_dir / "include" / "ffitarget.h",
             include_output / f"ffitarget_{suffix}.h",
