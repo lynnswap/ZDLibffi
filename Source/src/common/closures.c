@@ -170,7 +170,9 @@ ffi_tramp_is_present (__attribute__((unused)) void *ptr)
 #include <stdio.h>
 #include <stdlib.h>
 
-extern void *ffi_closure_trampoline_table_page;
+/* The assembly label is executable code. A function declaration supplies the
+   signature consumed by the arm64e authentication below. */
+extern void ffi_closure_trampoline_table_page (void);
 
 typedef struct ffi_trampoline_table ffi_trampoline_table;
 typedef struct ffi_trampoline_table_entry ffi_trampoline_table_entry;
